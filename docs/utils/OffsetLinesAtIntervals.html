@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>JSDoc: Class: FilletedPathModel</title>
+    <title>JSDoc: Class: OffsetLinesAtIntervals</title>
 
     <script src="scripts/prettify/prettify.js"> </script>
     <script src="scripts/prettify/lang-css.js"> </script>
@@ -17,7 +17,7 @@
 
 <div id="main">
 
-    <h1 class="page-title">Class: FilletedPathModel</h1>
+    <h1 class="page-title">Class: OffsetLinesAtIntervals</h1>
 
     
 
@@ -28,9 +28,9 @@
 
 <header>
     
-        <h2><span class="attribs"><span class="type-signature"></span></span>FilletedPathModel<span class="signature">(pathPoints, filletRadii, closed<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Model}</span></h2>
+        <h2><span class="attribs"><span class="type-signature"></span></span>OffsetLinesAtIntervals<span class="signature">(baseLineStart, baseLineEnd, intervals<span class="signature-attributes">opt</span>, relativeIntervals<span class="signature-attributes">opt</span>, lineLayer<span class="signature-attributes">opt</span>, flipPositiveDirection<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Model}</span></h2>
         
-            <div class="class-description">Creates a model from a series of points, filleting corners with the supplied radii</div>
+            <div class="class-description">Creates a model with a series of lines at given array of intervals</div>
         
     
 </header>
@@ -45,7 +45,7 @@
     
 
     
-    <h4 class="name" id="FilletedPathModel"><span class="type-signature"></span>new FilletedPathModel<span class="signature">(pathPoints, filletRadii, closed<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Model}</span></h4>
+    <h4 class="name" id="OffsetLinesAtIntervals"><span class="type-signature"></span>new OffsetLinesAtIntervals<span class="signature">(baseLineStart, baseLineEnd, intervals<span class="signature-attributes">opt</span>, relativeIntervals<span class="signature-attributes">opt</span>, lineLayer<span class="signature-attributes">opt</span>, flipPositiveDirection<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Model}</span></h4>
     
 
     
@@ -53,7 +53,7 @@
 
 
 <div class="description">
-    Create the model
+    Create a series of lines at given array of intervals
 </div>
 
 
@@ -93,7 +93,7 @@
 
         <tr>
             
-                <td class="name"><code>pathPoints</code></td>
+                <td class="name"><code>baseLineStart</code></td>
             
 
             <td class="type">
@@ -121,14 +121,14 @@
                 </td>
             
 
-            <td class="description last">The series of absolute points that represent the corners of the shape</td>
+            <td class="description last">Start point of the base line</td>
         </tr>
 
     
 
         <tr>
             
-                <td class="name"><code>filletRadii</code></td>
+                <td class="name"><code>baseLineEnd</code></td>
             
 
             <td class="type">
@@ -156,14 +156,53 @@
                 </td>
             
 
-            <td class="description last">The radii to use for each corner (starting at 0 for the first 2 points in PathPoints), any unsupplied points will be 0 (no fillet)</td>
+            <td class="description last">End point of the base line</td>
         </tr>
 
     
 
         <tr>
             
-                <td class="name"><code>closed</code></td>
+                <td class="name"><code>intervals</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Array</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    []
+                
+                </td>
+            
+
+            <td class="description last">Array of number offsets for the lines</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>relativeIntervals</code></td>
             
 
             <td class="type">
@@ -190,12 +229,90 @@
             
                 <td class="default">
                 
-                    false
+                    true
                 
                 </td>
             
 
-            <td class="description last">Close the model using the first and last points</td>
+            <td class="description last">If true intervals are interpreted as relative to the previous interval</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>lineLayer</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    null
+                
+                </td>
+            
+
+            <td class="description last">The layer to set the lines to</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>flipPositiveDirection</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">boolean</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    true
+                
+                </td>
+            
+
+            <td class="description last">FLip the direction of positive offsets relative to the baseline (e.g. go left or go right of the line)</td>
         </tr>
 
     
@@ -260,7 +377,7 @@
 
         
 <div class="param-desc">
-    The model
+    - The Model
 </div>
 
 
