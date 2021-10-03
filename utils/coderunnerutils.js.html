@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: coderunnerutils.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: coderunnerutils.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>import makerjs from 'makerjs';
+
+/**
+ * Creates an empty MakerJS model with default units of mm
+ */
+class EmptyModel {
+  constructor() {
+    this.paths = {};
+    this.models = {};
+    this.units = 'mm';
+  }
+}
+
+
+
+/**
+ * Creates a model from a series of points, filleting corners with the supplied radii
+ */
+class FilletedPathModel extends EmptyModel{
+/**
+ * Create the model
+ * @constructor
+ * @param {Array} pathPoints - The series of absolute points that represent the corners of the shape
+ * @param {Array} filletRadii - The radii to use for each corner (starting at 0 for the first 2 points in PathPoints), any unsupplied points will be 0 (no fillet)
+ * @param {Boolean} closed [closed=false] - Close the model using the first and last points
+ */
+  constructor(pathPoints,filletRadii,closed = false) {
+    super();
+
+    //if addToModel is null then create an empty models
+    //create each path an add to an array
+    //Condense the pathPoints into pairs
+    let pathPairs = [];
+    if (closed) {
+      //Add the last point back in at the end to close the loop
+      pathPoints.push(pathPoints[0]);
+    }
+    for (let i = 0; i &lt;= pathPoints.length-2; i++ ) {
+      pathPairs.push([pathPoints[i],pathPoints[i+1]]);
+    }
+
+    let paths = pathPairs.map((pathPair) => {
+      return new makerjs.paths.Line(pathPair[0],pathPair[1]);
+    });
+
+    //Step through the fillet radii to apply fillets where needed
+    let arcs = [];
+    filletRadii.forEach((filletRadius,index) => {
+      if (filletRadius) {
+        arcs.push(makerjs.path.fillet(
+          paths[index],
+          paths[index+1],
+          filletRadius
+        ));
+      }
+    });
+
+    paths.concat(arcs).forEach((addPath,index) => {
+      makerjs.path.addTo(addPath,this,index);
+    });
+  }
+}
+
+class OffsetLinesAtIntervals extends EmptyModel {
+  constructor(baseLineStart,baseLineEnd,intervals = [],relativeIntervals = true,lineLayer = null,flipPositiveDirection = false) {
+    super();
+    //Calculate the angle of the baseLineEnd
+    let baseLineAngle = makerjs.angle.ofPointInDegrees(baseLineStart,baseLineEnd)
+    let extensionLineAngle = baseLineAngle +90;
+    let cumulativeExtension = 0;
+    intervals = Array.isArray(intervals)?intervals:[intervals];
+    intervals.forEach(intervalDist => {
+      let offsetLine;
+      if (relativeIntervals) {
+        cumulativeExtension += intervalDist;
+      } else {
+        cumulativeExtension = intervalDist;
+      }
+
+      if (cumulativeExtension == 0) {
+        offsetLine = new makerjs.paths.Line(baseLineStart,baseLineEnd);
+      } else {
+        let distPoint = makerjs.point.fromPolar(makerjs.angle.toRadians(extensionLineAngle),cumulativeExtension);
+        offsetLine = new makerjs.paths.Line(
+          makerjs.point.add(baseLineStart,distPoint),
+          makerjs.point.add(baseLineEnd,distPoint)
+        )
+        // console.log('offsetPoint',distPoint,offsetLine)
+      }
+
+      if (lineLayer) {
+        makerjs.path.layer(offsetLine,lineLayer);
+      }
+
+      makerjs.model.addPath(this,offsetLine);
+    })
+  }
+}
+
+export var CodeRunnerUtils = function(){
+  this.EmptyModel = EmptyModel;
+  this.FilletedPathModel = FilletedPathModel;
+  this.lineFromPointAtAngle = function(fromPoint,length,angleInDegrees) {
+    let angleInRadians = makerjs.angle.toRadians(angleInDegrees);
+    let toPoint = makerjs.point.add(fromPoint,makerjs.point.fromPolar(angleInRadians,length));
+    return new makerjs.paths.Line(fromPoint,toPoint);
+  };
+  this.enableSplitting = function(modelToSet) {
+    modelToSet.split = {
+      ifNeeded: true,
+      axis: 'auto'
+    }
+  } ;
+  this.autoCaptionModel = function(modelToCaption,caption,textHeight = 12,location = 'bottom') {
+    let modelExtents = makerjs.measure.modelExtents(modelToCaption);
+    makerjs.model.addCaption(
+      modelToCaption,
+      caption,
+      [modelExtents.low[0],modelExtents.low[1]],
+      [modelExtents.high[0],modelExtents.high[1]],
+    );
+    return modelToCaption;
+  };
+  this.cloneAndOffset = function(modelToClone,offset = [0,0]) {
+    return makerjs.model.moveRelative(makerjs.model.clone(modelToClone),offset);
+  };
+  this.pointFromPointAtAngle = function(fromPoint,length,angleInDegrees) {
+    let angleInRadians = makerjs.angle.toRadians(angleInDegrees);
+    let toPoint = makerjs.point.add(fromPoint,makerjs.point.fromPolar(angleInRadians,length));
+    return toPoint;
+  };
+  this.pointFromPointLineAtAngle= function(p1,p2,distance,params) {
+
+    params = Object.assign({
+      clockwise: false,
+      angle: 90,
+      inset: 0
+    },params);
+    //Get the angle of the points
+    let baseAngle = makerjs.angle.ofPointInDegrees(p1,p2);
+
+    let pointAngle = baseAngle - (params.clockwise?params.angle:-params.angle);
+    //can't use utils point from point at Angle as this sets the distance of the line - not the offset
+    let r = distance;
+    if (params.angle > 0) {
+      r = distance / (Math.sin(Math.PI * params.angle / 180));
+    }
+    return this.pointFromPointAtAngle(p1,r,pointAngle);
+  };
+
+  this.tabPointsFromPointLine = function(p1,p2,params) {
+    params = Object.assign({
+      distance: 0,
+      clockwise: false,
+      angle: 90,
+      baseInset: 0,
+      baseInset2: null,
+      angle2: null
+    },params);
+
+  // },clockwise=false,angle=90,inset=0,angle2 = null) {
+
+    if (params.distance != 0) {
+
+      let pi1 = p1.slice();
+      let pi2 = p2.slice();
+
+      if (params.baseInset2 == null) params.baseInset2 = params.baseInset;
+
+      if (params.baseInset > 0) {
+        pi1 = this.pointFromPointLineAtAngle(p1,p2,params.baseInset,{clockwise: params.clockwise,angle: 0});
+      }
+
+
+      if (params.baseInset2 > 0) {
+        pi2 = this.pointFromPointLineAtAngle(p2,p1,params.baseInset2,{clockwise: params.clockwise,angle: 0});
+      }
+
+      let tabP1 = this.pointFromPointLineAtAngle(pi1,pi2,params.distance,{
+        clockwise: params.clockwise,
+        angle: params.angle,
+        inset: params.inset
+      });
+
+      if (params.angle2 == null) params.angle2 = params.angle;
+
+      let tabP2 = this.pointFromPointLineAtAngle(pi2,pi1,params.distance,{
+        clockwise:!params.clockwise,
+        angle:params.angle2,
+        inset:params.inset
+      });
+
+      let result = [];
+      if (params.baseInset > 0) {
+        result.push(pi1);
+      }
+      result.push(tabP1)
+      result.push(tabP2)
+      if (params.baseInset2 > 0) {
+        result.push(pi2);
+      }
+
+      return result;
+    } else {
+      return [p1,p2];
+    }
+  }
+
+  this.relativePointListToAbsolute = function(points) {
+    let lastPoint = [0,0];
+    return points.map((thisPoint) => {
+        let absPoint = makerjs.point.add(lastPoint,thisPoint);
+        lastPoint = absPoint;
+        return absPoint;
+    });
+
+  }
+
+  this.addTabAtPointLineAtLineIndex = function(pointLine,index,params) {
+    params = Object.assign({
+      distance: 0,
+      clockwise: false,
+      angle: 90,
+      angle2: null,
+      autoWrap: true
+    },params);
+
+   let p1 = pointLine[index];
+
+
+   let p2Index = index+1;
+   if (((index+1) > (pointLine.length-1)) &amp;&amp; (params.autoWrap)) {p2Index = 0;}
+
+   let p2 = pointLine[p2Index];
+   let tabPoints = this.tabPointsFromPointLine(p1,p2,params);
+   //insert back into the array
+   pointLine.splice(index+1,0,...tabPoints);
+   return pointLine;
+  }
+
+  this.determineBendAllowance = function(params) {
+    params = Object.assign({
+      angle: 90,
+      materialThickness: 1,
+      innerRadius: null,
+      k: 0.5,
+      singleSided: false
+    },params);
+
+    if (params.innerRadius == null) {
+      params.innerRadius = Math.max(0.5, params.materialThickness/4);
+    }
+
+    //Bend allowance: BA = (angle * (Pi/180)) * (R + (K * T));
+    //auto approx: K = (log(min(100,(max(20*r,T)/T)))) / (2 * log(100))
+
+    let bendAllowance = (params.angle * (Math.PI / 180)) * (params.innerRadius + (params.k * params.materialThickness));
+
+    if (params.singleSided) {
+      bendAllowance = bendAllowance /2;
+    }
+
+    return bendAllowance;
+  }
+
+  this.chordalTrapezoidPointLine = function(params) {
+    params = Object.assign({
+      radiusDelta: 45, //required
+      innerChordLength: 10,
+      outerChordLength: null, //Calculated
+      innerRadius: null, //Overrides innerLength + outer length if specified
+      outerRadius: null,
+      angle: 30 //must specify either inner angle or (inner chord length or outer chord length)
+    },params);
+
+
+    //SIN = OPP / HYP
+    if (!params.innerRadius) {
+      params.innerRadius = params.innerChordLength / (Math.sin((params.angle/2) * (Math.PI / 180)));
+    }
+
+    if (params.radiusDelta) {
+      params.outerRadius = params.innerRadius + params.radiusDelta;
+
+    } else if (!params.radiusDelta) {
+      params.outerRadius = params.outerChordLength / (Math.sin((params.angle/2) * (Math.PI / 180)));
+    }
+
+    //Asusme angle set for now
+    //Offset the core point to - (minus) the innder radius  vertically
+    // let angledInnerRadiusPoint = utils.pointFromPointAtAngle([0,-params.innerRadius],params.innerRadius,params.angle);
+    let pointLine = [];
+    pointLine.push([0,0]);
+    pointLine.push(this.pointFromPointAtAngle([0,-params.innerRadius],params.innerRadius,90-params.angle));
+    pointLine.push(this.pointFromPointAtAngle([0,-params.innerRadius],params.outerRadius,90-params.angle));
+    pointLine.push([0,params.outerRadius - params.innerRadius]);
+
+    return pointLine;
+  }
+
+  this.cardSlotPointLine = function(outerWidth, outerHeight, tSlot = false, params=null) {
+    params = Object.assign({
+      baseWidthPCT: .75,
+      baseWidth: null, //if null - calculate from PCT value
+      stitchAllowance: 3.8,
+      sideInset: null, //= side allowance if = null - stitchAllowance
+      cardStickOutPCT: .2,
+      cardStickOut: null, //if null - calculate form PCT value
+      slotRiseAmountPCT: .2,
+      slotRiseAmount: null, //if null - calculate from PCT value
+      topLineSlopePCT: null, //if !=0 add a slope to the top line
+      topLineSlopeRise: 0, //if slope != null this is ignored and updated to be the value of width * slopePCT
+      topLinePoints: null, //if !=null Override the topline with custom points (first and last points will not be overriden)
+    },params);
+
+    //Calculate the actual values from any PCT values
+    if (params.sideInset == null) {
+      params.sideInset = params.stitchAllowance;
+    }
+
+    if (params.baseWidth == null) {
+      params.baseWidth = params.baseWidthPCT * outerWidth;
+    }
+
+    if (params.cardStickOut == null) {
+      params.cardStickOut = params.cardStickOutPCT * outerHeight;
+    }
+
+    if (params.slotRiseAmount == null) {
+      params.slotRiseAmount = params.slotRiseAmountPCT * outerHeight;
+    }
+
+    if (params.topLineSlopePCT != null) {
+      params.topLineSlopeRise = outerHeight * params.topLineSlopePCT;
+    }
+
+    if (params.topLineSlopeRise == null) {
+      params.topLineSlopeRise = 0;
+    }
+
+    let panelHeight = outerHeight - params.cardStickOut;
+    let panelWidth = outerWidth;
+
+    let pathPoints = [];
+    pathPoints.push([0, panelHeight]);
+    pathPoints.push([params.stitchAllowance, panelHeight]);
+    pathPoints.push([panelWidth-params.stitchAllowance, panelHeight + params.topLineSlopeRise]);
+    pathPoints.push([panelWidth, panelHeight + params.topLineSlopeRise]);
+
+    if (tSlot) {
+      pathPoints.push([panelWidth, panelHeight + params.topLineSlopeRise - params.slotRiseAmount]);
+      pathPoints.push([panelWidth - params.sideInset, panelHeight + params.topLineSlopeRise - params.slotRiseAmount]);
+
+      pathPoints.push([(panelWidth + params.baseWidth)/2, 0]);
+      pathPoints.push([(panelWidth - params.baseWidth)/2, 0]);
+
+      pathPoints.push([params.sideInset, panelHeight - params.slotRiseAmount]);
+      pathPoints.push([0, panelHeight - params.slotRiseAmount]);
+    } else {
+      pathPoints.push([panelWidth,0]);
+      pathPoints.push([0,0]);
+    }
+    return pathPoints;
+  }
+
+  this.OffsetLinesAtIntervals = OffsetLinesAtIntervals;
+
+}
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="EmptyModel.html">EmptyModel</a></li><li><a href="FilletedPathModel.html">FilletedPathModel</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.7</a> on Sat Oct 02 2021 20:04:46 GMT+0800 (Hong Kong Standard Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
